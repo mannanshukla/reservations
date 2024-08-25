@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Reservation</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-r from-purple-400 to-blue-400 min-h-screen flex items-center justify-center">
+  <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 w-full max-w-md">
+    <form id="reservation-form">
+      <div class="mb-4">
+        <label class="block text-gray-700 font-bold mb-2" for="name">
+          Name
+        </label>
+        <input
+          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          id="name"
+          type="text"
+          placeholder="Enter your name"
+        />
+      </div>
+      <div class="mb-4">
+        <label class="block text-gray-700 font-bold mb-2" for="phone">
+          Phone Number
+        </label>
+        <input
+          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          id="phone"
+          type="tel"
+          placeholder="Enter your phone number"
+        />
+      </div>
+      <div class="mb-4">
+        <label class="block text-gray-700 font-bold mb-2" for="party-size">
+          Party Size
+        </label>
+        <input
+          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          id="party-size"
+          type="number"
+          placeholder="Enter your party size"
+        />
+      </div>
+      <div class="mb-4">
+        <label class="block text-gray-700 font-bold mb-2">
+          Time Slot
+        </label>
+        <div class="grid grid-cols-3 gap-4" id="time-slot-buttons">
+          <!-- Time slot buttons will be dynamically generated here -->
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <button
+          class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+          type="submit"
+        >
+          Reserve
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 w-full max-w-md">
+    <div class="mb-4">
+      <label class="block text-gray-700 font-bold mb-2" for="check-in-phone">
+        Phone Number
+      </label>
+      <input
+        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+        id="check-in-phone"
+        type="tel"
+        placeholder="Enter your phone number"
+      />
+    </div>
+    <div class="flex items-center justify-between">
+      <button
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+        type="button"
+        id="check-in-button"
+      >
+        Check In
+      </button>
+    </div>
+    <div id="check-in-message" class="mt-4 text-center"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    // Add your JavaScript logic here
+    const reservationForm = document.getElementById('reservation-form');
+    const timeSlotButtonsContainer = document.getElementById('time-slot-buttons');
+    const checkInButton = document.getElementById('check-in-button');
+
+    // Function to create time slot buttons
+    function createTimeSlotButtons(availableTimeSlots) {
+      // Clear existing buttons
+      timeSlotButtonsContainer.innerHTML = '';
+
+      const timeSlots = [];
+      for (let hour = 13; hour <= 19; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          const label = new Date(`2000-01-01T${time}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+          timeSlots.push({ time, label });
+        }
+      }
+
+      timeSlots.forEach(slot => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.timeSlot = slot.time;
+        button.textContent = slot.label;
+
+        if (availableTimeSlots.includes(slot.time)) {
+          button.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded';
+          button.addEventListener('click', () => selectTimeSlot(button));
+        } else {
+          button.className = 'bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed';
+          button.disabled = true;
+        }
+
+        timeSlotButtonsContainer.appendChild(button);
+      });
+    }
+
+    // Function to select a time slot
+    function selectTimeSlot(selectedButton) {
+      const buttons = timeSlotButtonsContainer.querySelectorAll('button:not(:disabled)');
+      buttons.forEach(btn => btn.classList.remove('bg-blue-700'));
+      selectedButton.classList.add('bg-blue-700');
+    }
+
+    // Fetch available time slots and create buttons
+    async function fetchAvailableTimeSlots() {
+      try {
+        const response = await axios.get('/available-time-slots');
+        createTimeSlotButtons(response.data.available_time_slots);
+      } catch (error) {
+        console.error('Error fetching available time slots:', error);
+        createTimeSlotButtons([]); // Create all buttons as unavailable if there's an error
+      }
+    }
+
+    fetchAvailableTimeSlots();
+
+    reservationForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = document.getElementById('name').value;
+      const phone = document.getElementById('phone').value;
+      const partySize = document.getElementById('party-size').value;
+      const timeSlotInput = timeSlotButtonsContainer.querySelector('.bg-blue-700');
+      const timeSlot = timeSlotInput ? timeSlotInput.dataset.timeSlot : null;
+
+      if (!timeSlot) {
+        alert('Please select a time slot');
+        return;
+      }
+
+      try {
+        const response = await axios.post('/reservations', {
+          name,
+          phone_number: phone,
+          time_slot: timeSlot,
+          party_size: partySize,
+        });
+        if (response.data.message === "Reservation updated successfully") {
+          alert("Your reservation has been updated successfully.");
+        } else {
+          alert(response.data.message);
+        }
+        // Refresh available time slots after successful reservation
+        fetchAvailableTimeSlots();
+      } catch (error) {
+        alert(error.response.data.detail);
+      }
+    });
+
+    checkInButton.addEventListener('click', async () => {
+      const phoneNumber = document.getElementById('check-in-phone').value;
+      try {
+        const response = await axios.get(`/reservations/check-in?phone_number=${phoneNumber}`);
+        document.getElementById('check-in-message').textContent = response.data.message;
+      } catch (error) {
+        document.getElementById('check-in-message').textContent = 'Error checking in';
+      }
+    });
+  </script>
+</body>
+</html>
